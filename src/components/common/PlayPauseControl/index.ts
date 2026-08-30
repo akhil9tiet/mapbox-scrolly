@@ -1,0 +1,1 @@
+export { PlayPauseControl } from './PlayPauseControl';

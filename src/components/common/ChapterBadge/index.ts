@@ -1,0 +1,1 @@
+export { ChapterBadge } from './ChapterBadge';

@@ -1,0 +1,1 @@
+export { ScrollyLayout } from './ScrollyLayout';
