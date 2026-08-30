@@ -1,9 +1,14 @@
 import './App.css';
+import { Container } from './components/common';
+import { MapViewer } from './components';
 
 function App() {
   return (
     <div className="App">
-      <p>Hello</p>
+      <Container>
+        <h1>Mapbox Scrolly</h1>
+        <MapViewer />
+      </Container>
     </div>
   );
 }
