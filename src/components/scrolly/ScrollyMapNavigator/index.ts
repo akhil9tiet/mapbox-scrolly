@@ -1,0 +1,1 @@
+export { ScrollyMapNavigator } from './ScrollyMapNavigator';

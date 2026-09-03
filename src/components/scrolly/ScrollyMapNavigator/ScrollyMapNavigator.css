@@ -1,0 +1,186 @@
+.scrolly-navigator {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background-color: white;
+}
+
+.scrolly-navigator__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scrolly-navigator__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.scrolly-navigator__description {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #666;
+  line-height: 1.5;
+}
+
+.scrolly-navigator__progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.scrolly-navigator__progress-bar {
+  flex: 1;
+  height: 6px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.scrolly-navigator__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s ease;
+}
+
+.scrolly-navigator__progress-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #667eea;
+  white-space: nowrap;
+}
+
+.scrolly-navigator__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.scrolly-navigator__step-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #f5f5f5;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.scrolly-navigator__step-button:hover {
+  background-color: #e8e8ff;
+  border-color: #667eea;
+}
+
+.scrolly-navigator__step-button--active {
+  background-color: #667eea;
+  color: white;
+  border-color: #764ba2;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.scrolly-navigator__step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  background-color: rgba(102, 126, 234, 0.2);
+  color: #667eea;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.scrolly-navigator__step-button--active .scrolly-navigator__step-number {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.scrolly-navigator__step-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scrolly-navigator__controls {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.scrolly-navigator__button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+  transition: all 0.3s ease;
+}
+
+.scrolly-navigator__button:hover:not(:disabled) {
+  background-color: #667eea;
+  color: white;
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.scrolly-navigator__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scrolly-navigator__button--play {
+  background-color: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.scrolly-navigator__button--play:hover:not(:disabled) {
+  background-color: #5568d3;
+}
+
+.scrolly-navigator__button--playing {
+  background-color: #764ba2;
+}
+
+@media (max-width: 768px) {
+  .scrolly-navigator {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .scrolly-navigator__steps {
+    max-height: 200px;
+  }
+
+  .scrolly-navigator__title {
+    font-size: 1.25rem;
+  }
+
+  .scrolly-navigator__controls {
+    flex-wrap: wrap;
+  }
+
+  .scrolly-navigator__button {
+    flex: 0 1 calc(33.333% - 0.5rem);
+  }
+}

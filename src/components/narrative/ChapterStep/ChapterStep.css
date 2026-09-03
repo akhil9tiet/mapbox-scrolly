@@ -1,0 +1,94 @@
+.chapter-step {
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  background-color: #f9f9f9;
+  border-left: 4px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.chapter-step:hover {
+  background-color: #f0f0f0;
+  border-left-color: #667eea;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateX(4px);
+}
+
+.chapter-step--active {
+  background-color: #e8e8ff;
+  border-left-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.chapter-step--completed {
+  border-left-color: #4caf50;
+  opacity: 0.8;
+}
+
+.chapter-step__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.chapter-step__number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  background-color: #667eea;
+  color: white;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.chapter-step--completed .chapter-step__number {
+  background-color: #4caf50;
+}
+
+.chapter-step__number svg {
+  width: 20px;
+  height: 20px;
+}
+
+.chapter-step__title-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter-step__title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.chapter-step__description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.chapter-step__content {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
