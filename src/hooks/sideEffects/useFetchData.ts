@@ -32,7 +32,8 @@ export const useFetchData = (url: string, deps: any[] = []) => {
     };
 
     fetchData();
-  }, deps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, ...deps]);
 
   return {
     data: state.data,
