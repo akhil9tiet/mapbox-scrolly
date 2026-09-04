@@ -1,7 +1,7 @@
-import React, { useRef, useEffect } from 'react';
-import DeckGL from '@deck.gl/react';
+import React, { useEffect } from 'react';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { Layer } from '@deck.gl/core';
+import { useControl } from 'react-map-gl/maplibre';
 import './DeckOverlay.css';
 
 interface DeckOverlayProps {
@@ -21,35 +21,16 @@ export const DeckOverlay: React.FC<DeckOverlayProps> = ({
   onClick,
   onHover,
 }) => {
-  const deckRef = useRef<any>(null);
+  const overlay = useControl<MapboxOverlay>(() => new MapboxOverlay({
+    interleaved: false,
+    onViewStateChange,
+    onClick,
+    onHover,
+  }));
 
   useEffect(() => {
-    const mapInstance = mapRef?.current;
-    if (mapInstance && deckRef.current) {
-      const overlay = new MapboxOverlay({
-        layers,
-        onViewStateChange,
-        onClick,
-        onHover,
-      });
-      mapInstance.addControl(overlay);
+    overlay.setProps({ layers, onViewStateChange, onClick, onHover });
+  }, [layers, onViewStateChange, onClick, onHover, overlay]);
 
-      return () => {
-        mapInstance.removeControl(overlay);
-      };
-    }
-  }, [layers, onViewStateChange, onClick, onHover, mapRef]);
-
-  return (
-    <div className="deck-overlay" ref={deckRef}>
-      <DeckGL
-        initialViewState={initialViewState}
-        controller={true}
-        layers={layers}
-        onViewStateChange={onViewStateChange}
-        onClick={onClick}
-        onHover={onHover}
-      />
-    </div>
-  );
+  return null;
 };
