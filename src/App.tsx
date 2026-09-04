@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArcLayer, PathLayer, ScatterplotLayer } from '@deck.gl/layers';
+import { Layer as MapLayer, Source } from 'react-map-gl/maplibre';
 import { DeckOverlay, GLOBE_SATELLITE_STYLE, MapCanvas } from './components/map';
 import { ViewState } from './types';
 import './App.css';
@@ -54,6 +55,38 @@ const createGreatCircleRoute = (from: [number, number], to: [number, number], st
 };
 
 const FLIGHT_ROUTE = createGreatCircleRoute(SFO, DELHI, 96);
+
+const toLineFeature = (coordinates: [number, number][]) => ({
+  type: 'Feature' as const,
+  properties: {},
+  geometry: { type: 'LineString' as const, coordinates },
+});
+
+const splitFlightRoute = (route: [number, number][]) => {
+  const segments: [number, number][][] = route.length ? [[ [normalizeLongitude(route[0][0]), route[0][1]] ]] : [];
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    const previousLongitude = normalizeLongitude(previous[0]);
+    const currentLongitude = normalizeLongitude(current[0]);
+    if (Math.abs(currentLongitude - previousLongitude) <= 180) {
+      segments[segments.length - 1].push([currentLongitude, current[1]]);
+      continue;
+    }
+    const eastward = currentLongitude < previousLongitude;
+    const wrappedCurrent = eastward ? currentLongitude + 360 : currentLongitude - 360;
+    const fraction = (180 - Math.abs(previousLongitude)) / Math.abs(wrappedCurrent - previousLongitude);
+    const crossingLatitude = previous[1] + (current[1] - previous[1]) * fraction;
+    segments[segments.length - 1].push([eastward ? 180 : -180, crossingLatitude]);
+    segments.push([[eastward ? -180 : 180, crossingLatitude], [currentLongitude, current[1]]]);
+  }
+  return segments.filter((segment) => segment.length > 1);
+};
+
+const flightGuideData = {
+  type: 'FeatureCollection' as const,
+  features: splitFlightRoute(FLIGHT_ROUTE).map(toLineFeature),
+};
 
 const traceRoute = (route: [number, number][], progress: number): [number, number][] => {
   if (progress <= 0 || route.length < 2) return [];
@@ -187,6 +220,12 @@ function App() {
     return traceRoute(FLIGHT_ROUTE, routeProgress);
   }, [routeProgress]);
 
+  const flightProgressData = useMemo(() => ({
+    type: 'FeatureCollection' as const,
+    features: splitFlightRoute(tracedFlight).map(toLineFeature),
+  }), [tracedFlight]);
+  const flightPathSegments = useMemo(() => splitFlightRoute(tracedFlight), [tracedFlight]);
+
   const chapterCamera = lerpView(
     story.chapters[chapterIndex].viewState,
     story.chapters[Math.min(segmentCount, chapterIndex + 1)].viewState,
@@ -203,14 +242,17 @@ function App() {
       ? [normalizeLongitude(tracedFlight[tracedFlight.length - 1][0]), tracedFlight[tracedFlight.length - 1][1]] as [number, number]
       : null;
     return [
-    new ArcLayer({ id: 'flight-arc', data: storyIndex === 0 && aircraftPosition ? [{ source: SFO, target: aircraftPosition }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 240], getTargetColor: [255, 91, 111, 240], getWidth: 5, getHeight: 0.45, greatCircle: true }),
-    new PathLayer({ id: 'road-route', data: storyIndex === 1 ? [{ path: tracedRoad }] : [], getPath: (d: any) => d.path, getColor: [255, 91, 111, 240], getWidth: 5, widthMinPixels: 3, jointRounded: true, capRounded: true }),
-    new ScatterplotLayer({ id: 'story-points', data: storyIndex === 1 ? [{ position: SFO }, { position: BRIDGE }] : [{ position: SFO }, { position: DELHI }], getPosition: (d: any) => d.position, getFillColor: [255, 188, 92, 245], getRadius: 3500, radiusMinPixels: 6, radiusMaxPixels: 15 }),
+      new ArcLayer({ id: 'flight-route-guide-arc', data: storyIndex === 0 ? [{ source: SFO, target: DELHI }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 130], getTargetColor: [255, 91, 111, 150], getWidth: 3, widthUnits: 'pixels', widthMinPixels: 3, getHeight: 1, greatCircle: true, parameters: { depthTest: false } }),
+      new ArcLayer({ id: 'flight-route-guide', data: storyIndex === 0 ? [{ source: SFO, target: DELHI }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 105], getTargetColor: [255, 91, 111, 120], getWidth: 2, widthUnits: 'pixels', widthMinPixels: 2, getHeight: 0.45, greatCircle: true, parameters: { depthTest: false } }),
+      new ArcLayer({ id: 'flight-route-progress', data: storyIndex === 0 && aircraftPosition ? [{ source: SFO, target: aircraftPosition }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 255], getTargetColor: [255, 91, 111, 255], getWidth: 4, widthUnits: 'pixels', widthMinPixels: 4, getHeight: 1, greatCircle: true, parameters: { depthTest: false } }),
+      new PathLayer({ id: 'flight-route-visible', data: storyIndex === 0 ? flightPathSegments.map((path) => ({ path })) : [], getPath: (d: any) => d.path, getColor: [255, 188, 92, 255], getWidth: 4, widthUnits: 'pixels', widthMinPixels: 4, jointRounded: true, capRounded: true, parameters: { depthTest: false } }),
+      new PathLayer({ id: 'road-route', data: storyIndex === 1 ? [{ path: tracedRoad }] : [], getPath: (d: any) => d.path, getColor: [255, 91, 111, 240], getWidth: 5, widthMinPixels: 3, jointRounded: true, capRounded: true }),
+      new ScatterplotLayer({ id: 'story-points', data: storyIndex === 1 ? [{ position: SFO }, { position: BRIDGE }] : [{ position: SFO }, { position: DELHI }], getPosition: (d: any) => d.position, getFillColor: [255, 188, 92, 245], getRadius: 3500, radiusMinPixels: 6, radiusMaxPixels: 15 }),
     ];
-  }, [storyIndex, tracedFlight, tracedRoad]);
+  }, [storyIndex, flightPathSegments, tracedFlight, tracedRoad]);
 
   return <main className="App">
-    <section className="map-stage"><MapCanvas viewport={displayedCamera} mapStyle={storyIndex === 0 ? GLOBE_SATELLITE_STYLE : undefined}><DeckOverlay layers={layers} /></MapCanvas><div className="map-stage__label"><span className="live-dot" /> LIVE CARTOGRAPHY</div><div className="map-stage__coordinates">{displayedCamera.latitude.toFixed(2)}° / {displayedCamera.longitude.toFixed(2)}°</div></section>
+    <section className="map-stage"><MapCanvas viewport={displayedCamera} mapStyle={storyIndex === 0 ? GLOBE_SATELLITE_STYLE : undefined}>{storyIndex === 0 && <><Source id="flight-guide" type="geojson" data={flightGuideData}><MapLayer id="flight-guide-line" type="line" paint={{ 'line-color': '#ffbc5c', 'line-width': 2, 'line-opacity': 0.45 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} /></Source><Source id="flight-progress" type="geojson" data={flightProgressData}><MapLayer id="flight-progress-line" type="line" paint={{ 'line-color': '#ffbc5c', 'line-width': 4, 'line-opacity': 1 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} /></Source></>}<DeckOverlay layers={layers} /></MapCanvas><div className="map-stage__label"><span className="live-dot" /> LIVE CARTOGRAPHY</div><div className="map-stage__coordinates">{displayedCamera.latitude.toFixed(2)}° / {displayedCamera.longitude.toFixed(2)}°</div></section>
     <section className="story-rail"><header className="story-header"><p className="kicker">MAPBOX SCROLLY / 2026</p><h1>Routes are stories<br /><em>in motion.</em></h1><p className="intro">Scroll to move through two visual essays about distance, cities, and the spaces between them.</p><nav className="story-tabs" aria-label="Choose a story">{stories.map((item, index) => <button key={item.id} className={index === storyIndex ? 'is-active' : ''} onClick={() => { setStoryIndex(index); setScrollProgress(0); }}>{item.label}</button>)}</nav></header><section className="story" ref={storyRef} data-story={story.id}><div className="story__title"><span>0{storyIndex + 1}</span><h2>{story.title}</h2></div>{story.chapters.map((item, index) => <article key={item.title} className={`chapter ${index === chapterIndex ? 'is-active' : ''}`}><p className="chapter__eyebrow">{item.eyebrow}</p><h3>{item.title}</h3><p>{item.copy}</p></article>)}</section><footer className="story-footer">SCROLL / EXPLORE / REPEAT</footer></section>
   </main>;
 }
