@@ -2,6 +2,8 @@
 
 An interactive example of a **scrollytelling map**: as you read the story, the map follows a road trip from Twin Peaks to the Golden Gate Bridge in San Francisco.
 
+![Scrolly map demo](./demo.gif)
+
 [Open the live scrolly map](https://akhil9tiet.github.io/mapbox-scrolly).
 
 Scroll through the six story chapters to reveal the route, follow the moving camera, and watch the current street and journey progress update. You can also select a chapter to jump to that moment or replay the journey from the beginning.
