@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PathLayer } from '@deck.gl/layers';
 import Lenis from 'lenis';
 import { Marker } from 'react-map-gl/maplibre';
+import { initializeAnalytics, trackAnalyticsEvent } from './analytics';
 import { DeckOverlay, MapCanvas } from './components/map';
 import { ViewState } from './types';
 import 'lenis/dist/lenis.css';
@@ -20,6 +21,7 @@ const TWIN_PEAKS: Coordinate = [-122.4476, 37.7545];
 const GOLDEN_GATE: Coordinate = [-122.47498, 37.80778];
 const EMPTY_ROUTE: Coordinate[] = [];
 const SCROLL_EASING = (progress: number) => 1 - Math.pow(1 - progress, 4);
+const GA_MEASUREMENT_ID = process.env.REACT_APP_GA_MEASUREMENT_ID;
 
 const chapters = [
   {
@@ -185,6 +187,11 @@ function App() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const storyRef = useRef<HTMLElement | null>(null);
   const lenisRef = useRef<Lenis | null>(null);
+  const lastTrackedChapterRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    initializeAnalytics(GA_MEASUREMENT_ID);
+  }, []);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -267,6 +274,16 @@ function App() {
 
   const routeProgress = Math.min(1, scrollProgress / 0.8);
   const activeChapter = Math.min(chapters.length - 1, Math.round(scrollProgress * (chapters.length - 1)));
+
+  useEffect(() => {
+    if (lastTrackedChapterRef.current === activeChapter) return;
+    lastTrackedChapterRef.current = activeChapter;
+    trackAnalyticsEvent('chapter_view', {
+      chapter_number: activeChapter + 1,
+      chapter_title: chapters[activeChapter].title,
+    });
+  }, [activeChapter]);
+
   const route = routeData?.coordinates ?? EMPTY_ROUTE;
   const routeDistances = useMemo(() => cumulativeRouteDistances(route), [route]);
   const tracedRoute = useMemo(() => traceRoute(route, routeDistances, routeProgress), [route, routeDistances, routeProgress]);
