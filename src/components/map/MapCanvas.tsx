@@ -29,12 +29,15 @@ const OPEN_STREET_MAP_STYLE = {
   layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
 };
 
+const cartoApiKey = process.env.REACT_APP_CARTO_API_KEY;
 const CARTO_DARK_RASTER_STYLE = {
   version: 8 as const,
   sources: {
     carto: {
       type: 'raster' as const,
-      tiles: ['https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png'],
+      tiles: [
+        `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png${cartoApiKey ? `?key=${encodeURIComponent(cartoApiKey)}` : ''}`,
+      ],
       tileSize: 256,
       maxzoom: 20,
       attribution: '© OpenStreetMap contributors © CARTO',

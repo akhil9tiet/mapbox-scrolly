@@ -49,6 +49,8 @@ The included GitHub Actions workflow builds and deploys the site whenever change
 
 For the first deployment, open the repository's **Settings → Pages** and set the build and deployment source to **GitHub Actions**. Then push to `main`, or run **Deploy to GitHub Pages** from the repository's **Actions** tab. The published site is available at the link above after the workflow completes.
 
+To authenticate CARTO dark tiles, create a key at [CARTO's basemaps API key page](https://carto.com/basemaps/apikey/) and add it to the GitHub repository under **Settings → Secrets and variables → Actions → New repository secret**. Name the secret `REACT_APP_CARTO_API_KEY`. After saving it, rerun **Deploy to GitHub Pages** from the repository's **Actions** tab so the key is included in the next build. Since browser map keys are included in the published JavaScript, restrict the key to `akhil9tiet.github.io` in CARTO if domain restrictions are available. Without a key, the app still tries CARTO's dark tiles and falls back to OpenStreetMap if the style fails.
+
 ## How it works
 
 - **React** renders the story, chapter cards, and map interface.
