@@ -244,21 +244,23 @@ function App() {
       if (!cards?.length) return;
       const first = cards[0].getBoundingClientRect();
       const last = cards[cards.length - 1].getBoundingClientRect();
-      const firstCenter = window.scrollY + first.top + first.height / 2;
-      const lastCenter = window.scrollY + last.top + last.height / 2;
-      const readingPoint = window.scrollY + window.innerHeight * (window.innerWidth <= 900 ? 0.7 : 0.52);
+      const firstCenter = first.top + first.height / 2;
+      const lastCenter = last.top + last.height / 2;
+      const readingPoint = window.innerHeight * (window.innerWidth <= 900 ? 0.7 : 0.52);
       const progress = lastCenter === firstCenter ? 0 : (readingPoint - firstCenter) / (lastCenter - firstCenter);
       setScrollProgress(clamp(progress, 0, 1));
     };
-    const onScroll = () => {
+    const scheduleProgressUpdate = () => {
       if (!frame) frame = window.requestAnimationFrame(updateProgress);
     };
     updateProgress();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    const unsubscribeLenis = lenisRef.current?.on('scroll', scheduleProgressUpdate);
+    window.addEventListener('scroll', scheduleProgressUpdate, { passive: true });
+    window.addEventListener('resize', scheduleProgressUpdate);
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      unsubscribeLenis?.();
+      window.removeEventListener('scroll', scheduleProgressUpdate);
+      window.removeEventListener('resize', scheduleProgressUpdate);
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);

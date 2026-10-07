@@ -5,7 +5,7 @@ import { DEFAULT_VIEW_STATE, ViewState } from '../../types';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './MapCanvas.css';
 
-const CAMERA_RESPONSE_MS = 190;
+const CAMERA_RESPONSE_MS = 360;
 const angleDelta = (from: number, to: number) => ((to - from + 540) % 360) - 180;
 
 const easeCamera = (from: ViewState, to: ViewState, amount: number): ViewState => ({
@@ -162,7 +162,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [animateCamera, controlledViewport, reducedMotion, viewport]);
 
   useEffect(() => () => {
-    if (animationFrameRef.current !== null) window.cancelAnimationFrame(animationFrameRef.current);
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    previousFrameTimeRef.current = 0;
   }, []);
 
   const handleViewportChange = (newViewport: ViewState) => {
