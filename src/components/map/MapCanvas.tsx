@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import MapLibreMap from 'react-map-gl/maplibre';
 import * as maplibregl from 'maplibre-gl';
-import { DEFAULT_STYLE_URL, DEFAULT_VIEW_STATE, ViewState } from '../../types';
+import { DEFAULT_VIEW_STATE, ViewState } from '../../types';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './MapCanvas.css';
 
@@ -17,6 +17,21 @@ const OPEN_STREET_MAP_STYLE = {
   },
   layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
 };
+
+const cartoApiKey = process.env.REACT_APP_CARTO_API_KEY;
+const CARTO_DARK_RASTER_STYLE = cartoApiKey ? {
+  version: 8 as const,
+  sources: {
+    carto: {
+      type: 'raster' as const,
+      tiles: [`https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoApiKey)}`],
+      tileSize: 256,
+      maxzoom: 20,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+  },
+  layers: [{ id: 'carto-dark', type: 'raster' as const, source: 'carto' }],
+} : null;
 
 export const GLOBE_SATELLITE_STYLE = {
   version: 8 as const,
@@ -58,10 +73,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const [viewport, setViewport] = React.useState(initialViewport);
   const [useFallbackStyle, setUseFallbackStyle] = React.useState(false);
   const currentViewport = controlledViewport ?? viewport;
-  const cartoApiKey = process.env.REACT_APP_CARTO_API_KEY;
-  const defaultMapStyle = !useFallbackStyle && cartoApiKey
-    ? `https://basemaps.cartocdn.com/gl/positron-gl-style/style.json?apiKey=${cartoApiKey}`
-    : useFallbackStyle ? OPEN_STREET_MAP_STYLE : DEFAULT_STYLE_URL;
+  const defaultMapStyle = !useFallbackStyle && CARTO_DARK_RASTER_STYLE
+    ? CARTO_DARK_RASTER_STYLE
+    : OPEN_STREET_MAP_STYLE;
   const mapStyle = requestedMapStyle ?? defaultMapStyle;
 
   const handleViewportChange = (newViewport: ViewState) => {
@@ -74,10 +88,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       <MapLibreMap
         ref={mapRef}
         mapLib={maplibregl}
-        projection={{ type: 'globe' }}
+        projection={{ type: 'mercator' }}
         {...currentViewport}
         onMove={(evt: any) => handleViewportChange(evt.viewState)}
-        onError={() => setUseFallbackStyle(true)}
+        onError={() => {
+          if (!requestedMapStyle && !useFallbackStyle) setUseFallbackStyle(true);
+        }}
         style={{ width: '100%', height: '100%' }}
         mapStyle={mapStyle}
       >

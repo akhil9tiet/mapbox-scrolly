@@ -1,17 +1,16 @@
 .map-canvas {
+  position: relative;
   width: 100%;
   height: 100%;
-  position: relative;
+  background: #111711;
 }
 
-.map-canvas :global(.mapboxgl-canvas) {
+.map-canvas .maplibregl-canvas {
   position: absolute;
   top: 0;
   left: 0;
 }
 
-.map-canvas :global(.mapboxgl-control-container) {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+.map-canvas .maplibregl-control-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }

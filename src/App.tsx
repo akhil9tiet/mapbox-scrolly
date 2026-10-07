@@ -1,260 +1,431 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArcLayer, PathLayer, ScatterplotLayer } from '@deck.gl/layers';
-import { Layer as MapLayer, Source } from 'react-map-gl/maplibre';
-import { DeckOverlay, GLOBE_SATELLITE_STYLE, MapCanvas } from './components/map';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PathLayer } from '@deck.gl/layers';
+import { Marker } from 'react-map-gl/maplibre';
+import { DeckOverlay, MapCanvas } from './components/map';
 import { ViewState } from './types';
 import './App.css';
 
-type Chapter = { eyebrow: string; title: string; copy: string; viewState: ViewState };
-type Story = { id: string; label: string; title: string; chapters: Chapter[] };
-
-const SFO: [number, number] = [-122.375, 37.621];
-const BRIDGE: [number, number] = [-122.478, 37.819];
-const DELHI: [number, number] = [77.209, 28.614];
-const FALLBACK_ROAD_ROUTE: [number, number][] = [SFO, [-122.407, 37.64], [-122.419, 37.708], [-122.405, 37.775], [-122.445, 37.798], BRIDGE];
-const routeLength = (route: [number, number][]) => route.slice(1).reduce((total, point, index) => {
-  const previous = route[index];
-  const latitudeDistance = (point[1] - previous[1]) * 111;
-  const longitudeDistance = (point[0] - previous[0]) * 111 * Math.cos((previous[1] * Math.PI) / 180);
-  return total + Math.sqrt(latitudeDistance ** 2 + longitudeDistance ** 2);
-}, 0);
-
-const normalizeLongitude = (longitude: number): number => {
-  const normalized = ((longitude + 180) % 360 + 360) % 360 - 180;
-  return normalized === -180 ? 180 : normalized;
+type Coordinate = [longitude: number, latitude: number];
+type RoadStep = { name: string; distance: number };
+type RouteData = {
+  coordinates: Coordinate[];
+  distanceMeters: number;
+  durationSeconds: number;
+  steps: RoadStep[];
 };
 
-const createGreatCircleRoute = (from: [number, number], to: [number, number], steps: number): [number, number][] => {
-  const toRadians = (value: number) => (value * Math.PI) / 180;
-  const toDegrees = (value: number) => (value * 180) / Math.PI;
-  const fromLatitude = toRadians(from[1]);
-  const fromLongitude = toRadians(from[0]);
-  const toLatitude = toRadians(to[1]);
-  const toLongitude = toRadians(to[0]);
-  const fromVector = [Math.cos(fromLatitude) * Math.cos(fromLongitude), Math.cos(fromLatitude) * Math.sin(fromLongitude), Math.sin(fromLatitude)];
-  const toVector = [Math.cos(toLatitude) * Math.cos(toLongitude), Math.cos(toLatitude) * Math.sin(toLongitude), Math.sin(toLatitude)];
-  const angle = Math.acos(Math.min(1, Math.max(-1, fromVector[0] * toVector[0] + fromVector[1] * toVector[1] + fromVector[2] * toVector[2])));
-  const points: [number, number][] = [];
-  for (let index = 0; index <= steps; index += 1) {
-    const progress = index / steps;
-    const sine = Math.sin(angle);
-    const firstWeight = sine === 0 ? 1 - progress : Math.sin((1 - progress) * angle) / sine;
-    const secondWeight = sine === 0 ? progress : Math.sin(progress * angle) / sine;
-    const x = firstWeight * fromVector[0] + secondWeight * toVector[0];
-    const y = firstWeight * fromVector[1] + secondWeight * toVector[1];
-    const z = firstWeight * fromVector[2] + secondWeight * toVector[2];
-    let longitude = toDegrees(Math.atan2(y, x));
-    if (points.length > 0) {
-      const previousLongitude = points[points.length - 1][0];
-      while (longitude - previousLongitude > 180) longitude -= 360;
-      while (longitude - previousLongitude < -180) longitude += 360;
-    }
-    points.push([longitude, toDegrees(Math.atan2(z, Math.sqrt(x ** 2 + y ** 2)))]);
-  }
-  return points;
+const TWIN_PEAKS: Coordinate = [-122.4476, 37.7545];
+const GOLDEN_GATE: Coordinate = [-122.47498, 37.80778];
+const EMPTY_ROUTE: Coordinate[] = [];
+
+const chapters = [
+  {
+    eyebrow: '01 / GET ORIENTED',
+    title: 'Start with the whole picture.',
+    copy: 'See where the drive begins and ends before the journey starts. The destination is clear from the first frame.',
+  },
+  {
+    eyebrow: '02 / FOLLOW THE ROAD',
+    title: 'Roads, not a guess.',
+    copy: 'The route follows the drivable street network. Its current street name updates as the story moves.',
+  },
+  {
+    eyebrow: '03 / KEEP YOUR PLACE',
+    title: 'Never lose your bearings.',
+    copy: 'The map stays in view while the story changes. Read the next moment without giving up your place in the city.',
+  },
+  {
+    eyebrow: '04 / CHANGE THE SCALE',
+    title: 'Give each place some room.',
+    copy: 'The camera shifts with the route. Street detail gives way to a wider view as the Golden Gate draws near.',
+  },
+  {
+    eyebrow: '05 / ARRIVE',
+    title: 'Let the destination land.',
+    copy: 'The Golden Gate gets its own moment before the full route resolves. The story has a clear end point.',
+  },
+  {
+    eyebrow: '06 / YOUR PACE',
+    title: 'Scroll, or choose a chapter.',
+    copy: 'The journey follows your pace. Scroll to travel, tap a chapter to jump, or replay the route from the start.',
+  },
+];
+
+const ROUTE_URL = `https://router.project-osrm.org/route/v1/driving/${TWIN_PEAKS.join(',')};${GOLDEN_GATE.join(',')}?overview=full&geometries=geojson&steps=true`;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const segmentLengthKm = ([lon1, lat1]: Coordinate, [lon2, lat2]: Coordinate) => {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = radians(lat2 - lat1);
+  const longitudeDelta = radians(lon2 - lon1);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371.0088 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 };
 
-const FLIGHT_ROUTE = createGreatCircleRoute(SFO, DELHI, 96);
-
-const toLineFeature = (coordinates: [number, number][]) => ({
-  type: 'Feature' as const,
-  properties: {},
-  geometry: { type: 'LineString' as const, coordinates },
-});
-
-const splitFlightRoute = (route: [number, number][]) => {
-  const segments: [number, number][][] = route.length ? [[ [normalizeLongitude(route[0][0]), route[0][1]] ]] : [];
+const cumulativeRouteDistances = (route: Coordinate[]) => {
+  const distances = [0];
   for (let index = 1; index < route.length; index += 1) {
-    const previous = route[index - 1];
-    const current = route[index];
-    const previousLongitude = normalizeLongitude(previous[0]);
-    const currentLongitude = normalizeLongitude(current[0]);
-    if (Math.abs(currentLongitude - previousLongitude) <= 180) {
-      segments[segments.length - 1].push([currentLongitude, current[1]]);
-      continue;
-    }
-    const eastward = currentLongitude < previousLongitude;
-    const wrappedCurrent = eastward ? currentLongitude + 360 : currentLongitude - 360;
-    const fraction = (180 - Math.abs(previousLongitude)) / Math.abs(wrappedCurrent - previousLongitude);
-    const crossingLatitude = previous[1] + (current[1] - previous[1]) * fraction;
-    segments[segments.length - 1].push([eastward ? 180 : -180, crossingLatitude]);
-    segments.push([[eastward ? -180 : 180, crossingLatitude], [currentLongitude, current[1]]]);
+    distances.push(distances[index - 1] + segmentLengthKm(route[index - 1], route[index]));
   }
-  return segments.filter((segment) => segment.length > 1);
+  return distances;
 };
 
-const flightGuideData = {
-  type: 'FeatureCollection' as const,
-  features: splitFlightRoute(FLIGHT_ROUTE).map(toLineFeature),
-};
+const pointAlongRoute = (route: Coordinate[], distances: number[], progress: number): Coordinate => {
+  if (!route.length) return TWIN_PEAKS;
+  if (route.length === 1 || progress <= 0) return route[0];
+  if (progress >= 1) return route[route.length - 1];
 
-const traceRoute = (route: [number, number][], progress: number): [number, number][] => {
-  if (progress <= 0 || route.length < 2) return [];
-  if (progress >= 1) return route;
-  const targetDistance = routeLength(route) * progress;
-  let travelled = 0;
-  const traced = [route[0]];
-  for (let index = 1; index < route.length; index += 1) {
-    const from = route[index - 1];
-    const to = route[index];
-    const latitudeDistance = (to[1] - from[1]) * 111;
-    const longitudeDistance = (to[0] - from[0]) * 111 * Math.cos((from[1] * Math.PI) / 180);
-    const segment = Math.sqrt(latitudeDistance ** 2 + longitudeDistance ** 2);
-    if (travelled + segment >= targetDistance) {
-      const fraction = (targetDistance - travelled) / segment;
-      traced.push([from[0] + (to[0] - from[0]) * fraction, from[1] + (to[1] - from[1]) * fraction]);
-      return traced;
-    }
-    traced.push(to);
-    travelled += segment;
+  const targetDistance = distances[distances.length - 1] * progress;
+  let low = 1;
+  let high = distances.length - 1;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (distances[middle] < targetDistance) low = middle + 1;
+    else high = middle;
   }
-  return traced;
+  const from = route[low - 1];
+  const to = route[low];
+  const segment = distances[low] - distances[low - 1];
+  const amount = segment ? (targetDistance - distances[low - 1]) / segment : 0;
+  return [from[0] + (to[0] - from[0]) * amount, from[1] + (to[1] - from[1]) * amount];
 };
 
-const fitRouteView = (base: ViewState, route: [number, number][]): ViewState => {
-  if (route.length < 2) return base;
+const bearingBetween = ([fromLon, fromLat]: Coordinate, [toLon, toLat]: Coordinate) => {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitude1 = radians(fromLat);
+  const latitude2 = radians(toLat);
+  const longitudeDelta = radians(toLon - fromLon);
+  const y = Math.sin(longitudeDelta) * Math.cos(latitude2);
+  const x = Math.cos(latitude1) * Math.sin(latitude2)
+    - Math.sin(latitude1) * Math.cos(latitude2) * Math.cos(longitudeDelta);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+};
+
+const fitRouteView = (route: Coordinate[]): ViewState => {
+  if (route.length < 2) {
+    return { latitude: TWIN_PEAKS[1], longitude: TWIN_PEAKS[0], zoom: 13.8, bearing: 0, pitch: 38 };
+  }
   const longitudes = route.map(([longitude]) => longitude);
   const latitudes = route.map(([, latitude]) => latitude);
   const longitudeSpan = Math.max(0.02, Math.max(...longitudes) - Math.min(...longitudes));
   const latitudeSpan = Math.max(0.02, Math.max(...latitudes) - Math.min(...latitudes));
-  const centerLongitude = normalizeLongitude((Math.max(...longitudes) + Math.min(...longitudes)) / 2);
-  const centerLatitude = (Math.max(...latitudes) + Math.min(...latitudes)) / 2;
-  const longitudeZoom = Math.log2(360 / (longitudeSpan * 1.65));
-  const latitudeZoom = Math.log2(170 / (latitudeSpan * 1.65));
   return {
-    ...base,
-    latitude: centerLatitude,
-    longitude: centerLongitude,
-    zoom: Math.max(1.6, Math.min(12.5, Math.min(longitudeZoom, latitudeZoom))),
+    latitude: (Math.max(...latitudes) + Math.min(...latitudes)) / 2,
+    longitude: (Math.max(...longitudes) + Math.min(...longitudes)) / 2,
+    zoom: clamp(Math.min(Math.log2(360 / (longitudeSpan * 1.65)), Math.log2(170 / (latitudeSpan * 1.65))), 9.5, 12.5),
+    bearing: 0,
+    pitch: 22,
   };
 };
 
-const stories: Story[] = [
-  { id: 'flight', label: 'FLIGHT / SF → DELHI', title: 'The long way east', chapters: [
-    { eyebrow: '01 / DEPARTURE', title: 'San Francisco wakes up', copy: 'The route begins at the western edge of the continent, where the morning fog lifts off the bay.', viewState: { latitude: 37.621, longitude: -122.375, zoom: 10, bearing: 12, pitch: 44 } },
-    { eyebrow: '02 / LIFT OFF', title: 'Out over the Pacific', copy: 'The camera pulls back as the coast falls away. The great-circle route starts to reveal itself.', viewState: { latitude: 38, longitude: -150, zoom: 2.8, bearing: 24, pitch: 38 } },
-    { eyebrow: '03 / MIDPOINT', title: 'A blue hour between continents', copy: 'At cruising altitude, distance becomes the story. The arc bends with the shape of the earth.', viewState: { latitude: 42, longitude: -35, zoom: 2.6, bearing: 40, pitch: 34 } },
-    { eyebrow: '04 / ARRIVAL', title: 'New Delhi, in the haze', copy: 'The route resolves over northern India, bringing the lens down to the city at the other end.', viewState: { latitude: 28.614, longitude: 77.209, zoom: 10, bearing: -15, pitch: 46 } },
-    { eyebrow: '05 / THE WHOLE ARC', title: 'Distance, held in one frame', copy: 'Only now does the whole journey settle into view: one continuous line across oceans, borders, and time zones.', viewState: { latitude: 38, longitude: -18, zoom: 2.35, bearing: 18, pitch: 28 } },
-  ] },
-  { id: 'road', label: 'ROAD / SFO → GOLDEN GATE', title: 'One city, many thresholds', chapters: [
-    { eyebrow: '01 / THE START', title: 'Leave the runway behind', copy: 'From the airport, the road traces the peninsula north. The city is still a thin line on the horizon.', viewState: { latitude: 37.653, longitude: -122.39, zoom: 11, bearing: 5, pitch: 42 } },
-    { eyebrow: '02 / THE CROSSING', title: 'Through the city grid', copy: 'The route turns toward the bay, threading streets, hills, and the long view north.', viewState: { latitude: 37.75, longitude: -122.42, zoom: 11.2, bearing: 28, pitch: 48 } },
-    { eyebrow: '03 / THE LANDMARK', title: 'Golden Gate, in full view', copy: 'A final pan brings the bridge il nto frame: a destination, and a threshold to what comes next.', viewState: { latitude: 37.805, longitude: -122.457, zoom: 12.2, bearing: 8, pitch: 52 } },
-    { eyebrow: '04 / THE WHOLE ROAD', title: 'A route you can read', copy: 'The camera lifts just enough to show the complete drive, from the airport runway to the bridge span.', viewState: { latitude: 37.72, longitude: -122.425, zoom: 10.3, bearing: 0, pitch: 32 } },
-  ] },
-];
-
-const lerpView = (from: ViewState, to: ViewState, amount: number): ViewState => ({ latitude: from.latitude + (to.latitude - from.latitude) * amount, longitude: from.longitude + (to.longitude - from.longitude) * amount, zoom: from.zoom + (to.zoom - from.zoom) * amount, bearing: from.bearing + (to.bearing - from.bearing) * amount, pitch: from.pitch + (to.pitch - from.pitch) * amount });
-
-const flightCamera = (progress: number): ViewState => {
-  const departure: ViewState = { latitude: 37.621, longitude: -122.375, zoom: 8.5, bearing: 0, pitch: 18 };
-  const orbit: ViewState = { latitude: 24, longitude: -35, zoom: 1.55, bearing: 0, pitch: 0 };
-  const arrival: ViewState = { latitude: 28.614, longitude: 77.209, zoom: 7.8, bearing: 0, pitch: 22 };
-  if (progress < 0.18) {
-    return lerpView(departure, orbit, progress / 0.18);
+const routeCamera = (route: Coordinate[], distances: number[], progress: number, showWholeRoute: boolean): ViewState => {
+  if (showWholeRoute && route.length > 1) return fitRouteView(route);
+  if (route.length < 2) {
+    return { latitude: TWIN_PEAKS[1], longitude: TWIN_PEAKS[0], zoom: 14, bearing: 0, pitch: 42 };
   }
-  if (progress < 0.78) {
-    const rotation = (progress - 0.18) / 0.6;
-    return lerpView(orbit, { ...orbit, longitude: 42 }, rotation);
+
+  const position = pointAlongRoute(route, distances, progress);
+  const nextPosition = pointAlongRoute(route, distances, Math.min(1, progress + 0.012));
+  const previousPosition = pointAlongRoute(route, distances, Math.max(0, progress - 0.012));
+  const heading = progress >= 0.99 ? bearingBetween(previousPosition, position) : bearingBetween(position, nextPosition);
+  return {
+    longitude: position[0],
+    latitude: position[1],
+    zoom: progress < 0.035 || progress > 0.94 ? 14 : 13.65,
+    bearing: heading,
+    pitch: 48,
+  };
+};
+
+const traceRoute = (route: Coordinate[], distances: number[], progress: number): Coordinate[] => {
+  if (route.length < 2 || progress <= 0) return [];
+  if (progress >= 1) return route;
+
+  const targetDistance = distances[distances.length - 1] * progress;
+  const traced = [route[0]];
+  for (let index = 1; index < route.length; index += 1) {
+    if (distances[index] >= targetDistance) {
+      const from = route[index - 1];
+      const to = route[index];
+      const segment = distances[index] - distances[index - 1];
+      const amount = segment ? (targetDistance - distances[index - 1]) / segment : 0;
+      traced.push([from[0] + (to[0] - from[0]) * amount, from[1] + (to[1] - from[1]) * amount]);
+      return traced;
+    }
+    traced.push(route[index]);
   }
-  return lerpView({ ...orbit, longitude: 42 }, arrival, (progress - 0.78) / 0.22);
+  return traced;
+};
+
+const streetAtProgress = (steps: RoadStep[], progress: number, totalDistanceMeters: number) => {
+  if (!steps.length) return 'Road names loading';
+  const target = totalDistanceMeters * progress;
+  let travelled = 0;
+  for (const step of steps) {
+    travelled += step.distance;
+    if (travelled >= target && step.name) return step.name;
+  }
+  return [...steps].reverse().find((step) => step.name)?.name ?? 'Golden Gate Bridge';
+};
+
+const formatDistance = (meters: number) => {
+  const miles = meters / 1609.344;
+  return miles < 10 ? `${miles.toFixed(1)} mi` : `${Math.round(miles)} mi`;
 };
 
 function App() {
-  const [storyIndex, setStoryIndex] = useState(1);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [routeStatus, setRouteStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [retryCount, setRetryCount] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [roadRoute, setRoadRoute] = useState<[number, number][]>(FALLBACK_ROAD_ROUTE);
   const storyRef = useRef<HTMLElement | null>(null);
-  const story = stories[storyIndex];
-  const segmentCount = Math.max(1, story.chapters.length - 1);
-  const scaledProgress = scrollProgress * segmentCount;
-  const chapterIndex = Math.min(segmentCount, Math.floor(scaledProgress));
-  const localProgress = scaledProgress - chapterIndex;
-  const routeProgress = scrollProgress;
 
   useEffect(() => {
-    const loadRoadRoute = async () => {
+    const controller = new AbortController();
+    const loadRoute = async () => {
+      setRouteStatus('loading');
       try {
-        const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${SFO.join(',')};${BRIDGE.join(',')}?overview=full&geometries=geojson`);
-        if (!response.ok) throw new Error('Road route request failed');
+        const response = await fetch(ROUTE_URL, { signal: controller.signal });
+        if (!response.ok) throw new Error('Route request failed');
         const result = await response.json();
-        const coordinates = result.routes?.[0]?.geometry?.coordinates;
-        if (Array.isArray(coordinates) && coordinates.length > 1) {
-          setRoadRoute(coordinates);
+        const route = result.routes?.[0];
+        const coordinates = route?.geometry?.coordinates as Coordinate[] | undefined;
+        if (result.code !== 'Ok' || !coordinates || coordinates.length < 2) {
+          throw new Error('No road route found');
         }
+        const steps: RoadStep[] = (route.legs ?? []).flatMap((leg: any) => leg.steps ?? []).map((step: any) => ({
+          name: step.name ?? '',
+          distance: Number(step.distance ?? 0),
+        }));
+        setRouteData({
+          coordinates,
+          distanceMeters: Number(route.distance ?? 0),
+          durationSeconds: Number(route.duration ?? 0),
+          steps,
+        });
+        setRouteStatus('ready');
       } catch {
-        setRoadRoute(FALLBACK_ROAD_ROUTE);
+        if (!controller.signal.aborted) setRouteStatus('unavailable');
       }
     };
-    loadRoadRoute();
-  }, []);
+
+    void loadRoute();
+    return () => controller.abort();
+  }, [retryCount]);
 
   useEffect(() => {
     let frame = 0;
-    const updateTimeline = () => {
+    const updateProgress = () => {
       frame = 0;
-      const element = storyRef.current;
-      if (!element) return;
-      const bounds = element.getBoundingClientRect();
-      const travel = Math.max(1, bounds.height - window.innerHeight * 0.45);
-      const progress = Math.max(0, Math.min(1, (window.innerHeight * 0.45 - bounds.top) / travel));
-      setScrollProgress(progress);
+      const cards = storyRef.current?.querySelectorAll<HTMLElement>('.chapter-card');
+      if (!cards?.length) return;
+      const first = cards[0].getBoundingClientRect();
+      const last = cards[cards.length - 1].getBoundingClientRect();
+      const firstCenter = window.scrollY + first.top + first.height / 2;
+      const lastCenter = window.scrollY + last.top + last.height / 2;
+      const readingPoint = window.scrollY + window.innerHeight * (window.innerWidth <= 900 ? 0.7 : 0.52);
+      const progress = lastCenter === firstCenter ? 0 : (readingPoint - firstCenter) / (lastCenter - firstCenter);
+      setScrollProgress(clamp(progress, 0, 1));
     };
     const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(updateTimeline);
+      if (!frame) frame = window.requestAnimationFrame(updateProgress);
     };
-    updateTimeline();
+    updateProgress();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
-      if (frame) cancelAnimationFrame(frame);
+      if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [storyIndex]);
+  }, []);
 
-  const tracedRoad = useMemo(() => traceRoute(roadRoute, routeProgress), [roadRoute, routeProgress]);
+  const routeProgress = Math.min(1, scrollProgress / 0.8);
+  const activeChapter = Math.min(chapters.length - 1, Math.round(scrollProgress * (chapters.length - 1)));
+  const route = routeData?.coordinates ?? EMPTY_ROUTE;
+  const routeDistances = useMemo(() => cumulativeRouteDistances(route), [route]);
+  const tracedRoute = useMemo(() => traceRoute(route, routeDistances, routeProgress), [route, routeDistances, routeProgress]);
+  const camera = routeCamera(route, routeDistances, routeProgress, scrollProgress > 0.91);
+  const currentPosition = tracedRoute[tracedRoute.length - 1];
 
-  const tracedFlight = useMemo(() => {
-    return traceRoute(FLIGHT_ROUTE, routeProgress);
-  }, [routeProgress]);
+  const layers = useMemo(() => [
+    new PathLayer({
+      id: 'complete-road-route',
+      data: route.length > 1 ? [{ path: route }] : [],
+      getPath: (feature: { path: Coordinate[] }) => feature.path,
+      getColor: [205, 220, 198, 100],
+      getWidth: 3,
+      widthUnits: 'pixels',
+      widthMinPixels: 2,
+      jointRounded: true,
+      capRounded: true,
+    }),
+    new PathLayer({
+      id: 'route-highlight-halo',
+      data: tracedRoute.length > 1 ? [{ path: tracedRoute }] : [],
+      getPath: (feature: { path: Coordinate[] }) => feature.path,
+      getColor: [17, 22, 19, 235],
+      getWidth: 9,
+      widthUnits: 'pixels',
+      widthMinPixels: 7,
+      jointRounded: true,
+      capRounded: true,
+    }),
+    new PathLayer({
+      id: 'route-highlight',
+      data: tracedRoute.length > 1 ? [{ path: tracedRoute }] : [],
+      getPath: (feature: { path: Coordinate[] }) => feature.path,
+      getColor: [207, 243, 105, 255],
+      getWidth: 5,
+      widthUnits: 'pixels',
+      widthMinPixels: 4,
+      jointRounded: true,
+      capRounded: true,
+    }),
+  ], [route, tracedRoute]);
 
-  const flightProgressData = useMemo(() => ({
-    type: 'FeatureCollection' as const,
-    features: splitFlightRoute(tracedFlight).map(toLineFeature),
-  }), [tracedFlight]);
-  const flightPathSegments = useMemo(() => splitFlightRoute(tracedFlight), [tracedFlight]);
+  const handleChapterClick = useCallback((index: number) => {
+    const card = document.getElementById(`chapter-${index + 1}`);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    card?.scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: window.innerWidth <= 900 ? 'start' : 'center',
+    });
+  }, []);
 
-  const chapterCamera = lerpView(
-    story.chapters[chapterIndex].viewState,
-    story.chapters[Math.min(segmentCount, chapterIndex + 1)].viewState,
-    localProgress
+  const handleReplay = useCallback(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, []);
+
+  const durationMinutes = routeData ? Math.max(1, Math.round(routeData.durationSeconds / 60)) : null;
+  return (
+    <main className="App">
+      <section className="map-stage" aria-label="Animated road map from Twin Peaks to the Golden Gate Bridge">
+        <MapCanvas viewport={camera}>
+          <DeckOverlay layers={layers} />
+          <Marker longitude={TWIN_PEAKS[0]} latitude={TWIN_PEAKS[1]} anchor="center">
+            <div className="map-pin map-pin--start" aria-label="Start: Twin Peaks">
+              <span className="map-pin__point" />
+              <span className="map-pin__label"><small>START</small>Twin Peaks</span>
+            </div>
+          </Marker>
+          <Marker longitude={GOLDEN_GATE[0]} latitude={GOLDEN_GATE[1]} anchor="center">
+            <div className="map-pin map-pin--finish" aria-label="Finish: Golden Gate Bridge">
+              <span className="map-pin__point" />
+              <span className="map-pin__label"><small>FINISH</small>Golden Gate Bridge</span>
+            </div>
+          </Marker>
+          {currentPosition && routeProgress > 0.005 && (
+            <Marker longitude={currentPosition[0]} latitude={currentPosition[1]} anchor="center">
+              <span className="map-traveler" aria-label="Current position along the route" />
+            </Marker>
+          )}
+        </MapCanvas>
+
+        <div className="map-stage__topline">
+          <span className="map-stage__edition">FIELD STUDY <i>/</i> SAN FRANCISCO</span>
+          <span className="map-stage__live"><span /> LIVE ROUTE</span>
+        </div>
+
+        <div className="map-stage__caption">
+          <span className="map-stage__caption-label">ONE ROUTE / SIX MOMENTS</span>
+          <strong>Twin Peaks <b>to</b> the Golden Gate</strong>
+        </div>
+
+        <div className="map-stage__progress" aria-live="polite">
+          <div className="map-stage__progress-top">
+            <span>{routeData ? `${formatDistance(routeData.distanceMeters)} · ${durationMinutes} MIN EST.` : 'ROAD ROUTE'}</span>
+            <span>{String(activeChapter + 1).padStart(2, '0')} <i>/</i> {String(chapters.length).padStart(2, '0')}</span>
+          </div>
+          <div className="map-stage__progress-track"><span style={{ width: `${scrollProgress * 100}%` }} /></div>
+          <div className="map-stage__progress-bottom">
+            <span>{routeData ? streetAtProgress(routeData.steps, routeProgress, routeData.distanceMeters) : routeStatus === 'loading' ? 'Finding the mapped roads…' : 'Road route unavailable'}</span>
+            <span>{Math.round(scrollProgress * 100)}%</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="story-rail">
+        <header className="story-header">
+          <p className="kicker"><span /> INTERACTIVE FIELD STUDY / NO. 01</p>
+          <h1>The city,<br /><em>in motion.</em></h1>
+          <p className="intro">A road story from Twin Peaks to the Golden Gate. Keep your bearings as the map follows each turn.</p>
+
+          <div className="route-summary">
+            <div><span className="route-summary__label">FROM</span><strong>Twin Peaks</strong></div>
+            <span className="route-summary__connector" aria-hidden="true"><i /><i /><i /></span>
+            <div><span className="route-summary__label">TO</span><strong>Golden Gate Bridge</strong></div>
+          </div>
+
+          <div className="route-metrics" aria-label="Journey details">
+            <div><strong>{routeData ? formatDistance(routeData.distanceMeters) : '--'}</strong><span>TOTAL DRIVE</span></div>
+            <div><strong>{durationMinutes ?? '--'}<small> min</small></strong><span>EST. TIME</span></div>
+            <div><strong>{String(chapters.length).padStart(2, '0')}</strong><span>CHAPTERS</span></div>
+          </div>
+
+          <div className={`route-status route-status--${routeStatus}`} aria-live="polite">
+            <span className="route-status__dot" />
+            <span>{routeStatus === 'ready'
+              ? `Road route ready · ${formatDistance(routeData?.distanceMeters ?? 0)}`
+              : routeStatus === 'loading' ? 'Loading the road route from OpenStreetMap…' : 'Road route did not load.'}</span>
+            {routeStatus === 'unavailable' && <button type="button" onClick={() => setRetryCount((count) => count + 1)}>Try again</button>}
+          </div>
+
+          <button className="scroll-prompt" type="button" onClick={() => handleChapterClick(0)}>
+            <span>FOLLOW THE ROAD</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v13M4.5 10.5 10 16l5.5-5.5" /></svg>
+          </button>
+        </header>
+
+        <section className="story" ref={storyRef} aria-label="Journey chapters">
+          {chapters.map((chapter, index) => {
+            const sectionProgress = Math.min(1, index / (chapters.length - 2));
+            const street = routeData ? streetAtProgress(routeData.steps, sectionProgress, routeData.distanceMeters) : null;
+            return (
+              <button
+                id={`chapter-${index + 1}`}
+                key={chapter.eyebrow}
+                type="button"
+                className={`chapter-card ${index === activeChapter ? 'is-active' : ''}`}
+                onClick={() => handleChapterClick(index)}
+                aria-current={index === activeChapter ? 'step' : undefined}
+                aria-label={`${chapter.eyebrow}. ${chapter.title} Scroll to this chapter.`}
+              >
+                <span className="chapter-card__topline">
+                  <span className="chapter-card__eyebrow">{chapter.eyebrow}</span>
+                  <span className="chapter-card__number">{String(index + 1).padStart(2, '0')}</span>
+                </span>
+                <span className="chapter-card__title">{chapter.title}</span>
+                <span className="chapter-card__copy">{chapter.copy}</span>
+                <span className="chapter-card__footer">
+                  <span className="chapter-card__street"><i /> {street ?? (routeStatus === 'loading' ? 'LOADING STREET DATA' : 'ROAD DATA UNAVAILABLE')}</span>
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13m-5-5 5 5-5 5" /></svg>
+                </span>
+              </button>
+            );
+          })}
+        </section>
+
+        <footer className="story-footer">
+          <div className="story-footer__principle">
+            <span>THE DESIGN PRINCIPLE</span>
+            <p>Keep the map in view.<br />Keep the next moment clear.</p>
+          </div>
+          <button className="story-footer__replay" type="button" onClick={handleReplay}>
+            <span>REPLAY THE ROUTE</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 9a6 6 0 1 1 1.7 4.2M4 4v5h5" /></svg>
+          </button>
+          <div className="story-footer__credits">
+            <span>ROUTE BY OSRM</span>
+            <span>MAP DATA © OPENSTREETMAP CONTRIBUTORS</span>
+          </div>
+        </footer>
+      </section>
+    </main>
   );
-  const camera = fitRouteView(
-    chapterCamera,
-    storyIndex === 0 ? [] : tracedRoad
-  );
-  const displayedCamera = storyIndex === 0 ? flightCamera(routeProgress) : camera;
-
-  const layers = useMemo(() => {
-    const aircraftPosition = tracedFlight.length > 0
-      ? [normalizeLongitude(tracedFlight[tracedFlight.length - 1][0]), tracedFlight[tracedFlight.length - 1][1]] as [number, number]
-      : null;
-    return [
-      new ArcLayer({ id: 'flight-route-guide-arc', data: storyIndex === 0 ? [{ source: SFO, target: DELHI }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 130], getTargetColor: [255, 91, 111, 150], getWidth: 3, widthUnits: 'pixels' as const, widthMinPixels: 3, getHeight: 0.5, greatCircle: true }),
-      new ArcLayer({ id: 'flight-route-guide', data: storyIndex === 0 ? [{ source: SFO, target: DELHI }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 105], getTargetColor: [255, 91, 111, 120], getWidth: 2, widthUnits: 'pixels' as const, widthMinPixels: 2, getHeight: 0.3, greatCircle: true }),
-      new ArcLayer({ id: 'flight-route-progress', data: storyIndex === 0 && aircraftPosition ? [{ source: SFO, target: aircraftPosition }] : [], getSourcePosition: (d: any) => d.source, getTargetPosition: (d: any) => d.target, getSourceColor: [255, 188, 92, 255], getTargetColor: [255, 91, 111, 255], getWidth: 4, widthUnits: 'pixels' as const, widthMinPixels: 4, getHeight: 0.5, greatCircle: true }),
-      new PathLayer({ id: 'flight-route-visible', data: storyIndex === 0 ? flightPathSegments.map((path) => ({ path })) : [], getPath: (d: any) => d.path, getColor: [255, 188, 92, 255], getWidth: 4, widthUnits: 'pixels' as const, widthMinPixels: 4, jointRounded: true, capRounded: true }),
-      new PathLayer({ id: 'road-route', data: storyIndex === 1 ? [{ path: tracedRoad }] : [], getPath: (d: any) => d.path, getColor: [255, 91, 111, 240], getWidth: 5, widthMinPixels: 3, jointRounded: true, capRounded: true }),
-      new ScatterplotLayer({ id: 'story-points', data: storyIndex === 1 ? [{ position: SFO }, { position: BRIDGE }] : [{ position: SFO }, { position: DELHI }], getPosition: (d: any) => d.position, getFillColor: [255, 188, 92, 245], getRadius: 3500, radiusMinPixels: 6, radiusMaxPixels: 15 }),
-    ];
-  }, [storyIndex, flightPathSegments, tracedFlight, tracedRoad]);
-
-  return <main className="App">
-    <section className="map-stage"><MapCanvas viewport={displayedCamera} mapStyle={storyIndex === 0 ? GLOBE_SATELLITE_STYLE : undefined}>{storyIndex === 0 && <><Source id="flight-guide" type="geojson" data={flightGuideData}><MapLayer id="flight-guide-line" type="line" paint={{ 'line-color': '#ffbc5c', 'line-width': 2, 'line-opacity': 0.45 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} /></Source><Source id="flight-progress" type="geojson" data={flightProgressData}><MapLayer id="flight-progress-line" type="line" paint={{ 'line-color': '#ffbc5c', 'line-width': 4, 'line-opacity': 1 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} /></Source></>}<DeckOverlay layers={layers} /></MapCanvas><div className="map-stage__label"><span className="live-dot" /> LIVE CARTOGRAPHY</div><div className="map-stage__coordinates">{displayedCamera.latitude.toFixed(2)}° / {displayedCamera.longitude.toFixed(2)}°</div></section>
-    <section className="story-rail"><header className="story-header"><p className="kicker">MAPBOX SCROLLY / 2026</p><h1>Routes are stories<br /><em>in motion.</em></h1><p className="intro">Scroll to move through two visual essays about distance, cities, and the spaces between them.</p><nav className="story-tabs" aria-label="Choose a story">{stories.map((item, index) => <button key={item.id} className={index === storyIndex ? 'is-active' : ''} onClick={() => { setStoryIndex(index); setScrollProgress(0); }}>{item.label}</button>)}</nav></header><section className="story" ref={storyRef} data-story={story.id}><div className="story__title"><span>0{storyIndex + 1}</span><h2>{story.title}</h2></div>{story.chapters.map((item, index) => <article key={item.title} className={`chapter ${index === chapterIndex ? 'is-active' : ''}`}><p className="chapter__eyebrow">{item.eyebrow}</p><h3>{item.title}</h3><p>{item.copy}</p></article>)}</section><footer className="story-footer">SCROLL / EXPLORE / REPEAT</footer></section>
-  </main>;
 }
 
 export default App;
