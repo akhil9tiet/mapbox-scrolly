@@ -34,6 +34,7 @@ jobs:
       - name: Build site
         run: npm run build
         env:
+          CI: false
           REACT_APP_CARTO_API_KEY: ${{ secrets.REACT_APP_CARTO_API_KEY }}
 
       - name: Configure GitHub Pages
