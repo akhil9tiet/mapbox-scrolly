@@ -7,6 +7,7 @@
   --rule: #2a342c;
   --accent: #cff36a;
   --accent-soft: #a9cf50;
+  --pixel: 'Pixelify Sans', 'Courier New', monospace;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   --serif: 'Iowan Old Style', 'Baskerville', 'Palatino Linotype', Georgia, serif;
 }
@@ -22,7 +23,7 @@
 
 .map-stage {
   position: fixed;
-  inset: 0 0 0 43%;
+  inset: 0;
   z-index: 0;
   overflow: hidden;
   background: #111711;
@@ -38,13 +39,15 @@
   min-height: 100vh;
   padding: 0 clamp(30px, 4.7vw, 76px);
   border-right: 1px solid rgba(237, 240, 231, .07);
-  background:
-    radial-gradient(ellipse at 12% 4%, rgba(207, 243, 106, .055), transparent 36%),
-    var(--paper);
+  --serif: var(--pixel);
+  --mono: var(--pixel);
+  font-family: var(--pixel);
+  background: transparent;
 }
 
 .story-header {
   display: flex;
+  min-height: 100vh;
   min-height: 100svh;
   flex-direction: column;
   justify-content: center;
@@ -96,7 +99,7 @@
   font-family: var(--serif);
   font-size: clamp(56px, 6.25vw, 92px);
   font-weight: 400;
-  letter-spacing: -.06em;
+  letter-spacing: 0;
   line-height: .91;
 }
 
@@ -136,7 +139,7 @@
 
 .route-metrics > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 12px 11px 11px; }
 .route-metrics > div + div { border-left: 1px solid rgba(237, 240, 231, .09); }
-.route-metrics > div > strong { color: var(--ink); font-family: var(--serif); font-size: 21px; font-weight: 400; letter-spacing: -.035em; white-space: nowrap; }
+.route-metrics > div > strong { color: var(--ink); font-family: var(--serif); font-size: 21px; font-weight: 400; letter-spacing: 0; white-space: nowrap; }
 .route-metrics > div > strong small { color: var(--muted); font: 400 11px/1 var(--mono); letter-spacing: 0; }
 .route-metrics > div > span { color: var(--quiet); font-size: 8px; letter-spacing: .075em; white-space: nowrap; }
 
@@ -179,6 +182,7 @@
   position: relative;
   display: flex;
   width: 100%;
+  min-height: 64vh;
   min-height: 64svh;
   flex-direction: column;
   justify-content: center;
@@ -225,7 +229,7 @@
   font-family: var(--serif);
   font-size: clamp(37px, 4vw, 58px);
   font-weight: 400;
-  letter-spacing: -.05em;
+  letter-spacing: -.01em;
   line-height: 1.01;
   transition: color .25s ease;
 }
@@ -258,7 +262,7 @@
 }
 
 .story-footer__principle > span { color: var(--accent); font-size: 9px; }
-.story-footer__principle p { margin: 10px 0 0; color: var(--ink); font: 400 25px/1.18 var(--serif); letter-spacing: -.025em; }
+.story-footer__principle p { margin: 10px 0 0; color: var(--ink); font: 400 25px/1.18 var(--serif); letter-spacing: 0; }
 .story-footer__replay { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 13px 0; border: 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: transparent; color: var(--ink); font: 600 9px/1.4 var(--mono); letter-spacing: .1em; text-align: left; cursor: pointer; transition: color .2s ease; }
 .story-footer__replay:hover { color: var(--accent); }
 .story-footer__replay svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.2; }
@@ -267,7 +271,7 @@
 .map-stage__topline {
   position: absolute;
   top: 25px;
-  left: 28px;
+  left: 46%;
   right: 28px;
   display: flex;
   align-items: center;
@@ -301,7 +305,7 @@
 .map-stage__caption {
   position: absolute;
   top: 50%;
-  left: 28px;
+  left: 46%;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -322,7 +326,7 @@
   position: absolute;
   right: 112px;
   bottom: 28px;
-  left: 28px;
+  left: 46%;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -352,6 +356,30 @@
 
 @keyframes status-pulse { 50% { opacity: .35; } }
 
+@media (min-width: 1400px) {
+  .story-rail { width: 41%; padding-right: clamp(76px, 6vw, 110px); padding-left: clamp(54px, 5vw, 94px); }
+  .story-header { padding-top: 70px; padding-bottom: 64px; }
+  .story-header h1 { font-size: clamp(82px, 6vw, 112px); }
+  .chapter-card { min-height: 68vh; min-height: 68svh; }
+  .map-stage__topline { top: 32px; left: 44%; right: 36px; }
+  .map-stage__caption { left: 44%; }
+  .map-stage__progress { bottom: 36px; left: 44%; }
+}
+
+@media (min-width: 901px) and (max-height: 720px) {
+  .story-header { padding-top: 34px; padding-bottom: 34px; }
+  .story-header h1 { font-size: clamp(48px, 5.5vw, 76px); }
+  .kicker { margin-bottom: 17px; }
+  .intro { margin-top: 18px; margin-bottom: 19px; font-size: 16px; }
+  .route-summary { padding-top: 11px; padding-bottom: 11px; }
+  .route-metrics { margin-top: 8px; }
+  .route-metrics > div { padding-top: 8px; padding-bottom: 8px; }
+  .route-metrics > div > strong { font-size: 18px; }
+  .route-status { min-height: 32px; }
+  .scroll-prompt { margin-top: 11px; }
+  .chapter-card { min-height: 58vh; min-height: 58svh; }
+}
+
 @media (max-width: 1000px) and (min-width: 901px) {
   .story-rail { padding-right: 27px; padding-left: 27px; }
   .story-header h1 { font-size: clamp(49px, 6.3vw, 68px); }
@@ -360,19 +388,19 @@
   .route-metrics > div { padding-right: 7px; padding-left: 7px; }
   .route-metrics > div > strong { font-size: 18px; }
   .route-metrics > div > span { font-size: 7px; }
-  .map-stage__caption { left: 20px; }
-  .map-stage__topline { left: 20px; right: 20px; }
-  .map-stage__progress { right: 95px; left: 20px; }
+  .map-stage__caption { left: 46%; }
+  .map-stage__topline { left: 46%; right: 20px; }
+  .map-stage__progress { right: 95px; left: 46%; }
 }
 
 @media (max-width: 900px) {
   .App { display: block; overflow: visible; }
-  .map-stage { position: sticky; inset: auto; top: 0; width: 100%; height: 42svh; min-height: 270px; max-height: 440px; z-index: 5; }
+  .map-stage { position: sticky; inset: auto; top: 0; width: 100%; height: 42vh; height: 42svh; min-height: 270px; max-height: 440px; z-index: 5; }
   .story-rail { width: 100%; min-height: auto; padding: 0 28px; border-right: 0; }
-  .story-header { min-height: 78svh; padding: 48px 0 38px; }
+  .story-header { min-height: 78vh; min-height: 78svh; padding: 48px 0 38px; }
   .story-header h1 { font-size: clamp(58px, 12vw, 92px); }
   .intro { max-width: 500px; font-size: 18px; }
-  .chapter-card { min-height: 58svh; scroll-margin-top: calc(42svh + 16px); }
+  .chapter-card { min-height: 58vh; min-height: 58svh; scroll-margin-top: calc(42vh + 16px); scroll-margin-top: calc(42svh + 16px); }
   .chapter-card__title { font-size: clamp(41px, 9vw, 62px); }
   .map-stage__caption { top: auto; bottom: 98px; left: 18px; transform: none; }
   .map-stage__topline { top: 14px; left: 14px; right: 14px; }
@@ -386,7 +414,7 @@
 
 @media (max-width: 480px) {
   .story-rail { padding: 0 21px; }
-  .story-header { min-height: 82svh; }
+  .story-header { min-height: 82vh; min-height: 82svh; }
   .story-header h1 { font-size: clamp(53px, 13vw, 68px); }
   .intro { margin-top: 22px; font-size: 17px; }
   .route-summary { gap: 8px; }
@@ -396,7 +424,7 @@
   .route-metrics > div > strong { font-size: 18px; }
   .route-metrics > div > span { font-size: 7px; }
   .route-status { font-size: 8px; }
-  .chapter-card { min-height: 56svh; }
+  .chapter-card { min-height: 56vh; min-height: 56svh; }
   .chapter-card__copy { font-size: 15px; }
   .map-stage__caption { bottom: 88px; padding: 9px 11px 10px; }
   .map-stage__caption strong { font-size: 15px; }
@@ -404,6 +432,29 @@
   .map-stage__edition { letter-spacing: .06em; }
   .map-stage__live { letter-spacing: .04em; }
   .map-pin__label { font-size: 8px; }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .map-stage { height: 38vh; height: 38svh; min-height: 230px; max-height: 320px; }
+  .chapter-card { scroll-margin-top: calc(38vh + 16px); scroll-margin-top: calc(38svh + 16px); }
+  .map-stage__caption { bottom: 82px; }
+  .map-stage__progress { right: 82px; }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .map-stage { height: 52vh; min-height: 190px; max-height: 260px; }
+  .story-header { min-height: auto; padding-top: 38px; padding-bottom: 34px; }
+  .story-header h1 { font-size: clamp(46px, 8vw, 72px); }
+  .intro { margin-top: 16px; margin-bottom: 20px; }
+  .chapter-card { min-height: 78vh; scroll-margin-top: calc(52vh + 14px); }
+  .map-stage__caption { bottom: 78px; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .scroll-prompt,
+  .route-status button { min-height: 44px; }
+  .story-footer__replay { min-height: 48px; }
+  .chapter-card { touch-action: pan-y; }
 }
 
 @media (prefers-reduced-motion: reduce) {

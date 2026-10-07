@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PathLayer } from '@deck.gl/layers';
+import Lenis from 'lenis';
 import { Marker } from 'react-map-gl/maplibre';
 import { DeckOverlay, MapCanvas } from './components/map';
 import { ViewState } from './types';
+import 'lenis/dist/lenis.css';
 import './App.css';
 
 type Coordinate = [longitude: number, latitude: number];
@@ -17,6 +19,7 @@ type RouteData = {
 const TWIN_PEAKS: Coordinate = [-122.4476, 37.7545];
 const GOLDEN_GATE: Coordinate = [-122.47498, 37.80778];
 const EMPTY_ROUTE: Coordinate[] = [];
+const SCROLL_EASING = (progress: number) => 1 - Math.pow(1 - progress, 4);
 
 const chapters = [
   {
@@ -181,6 +184,24 @@ function App() {
   const [retryCount, setRetryCount] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
   const storyRef = useRef<HTMLElement | null>(null);
+  const lenisRef = useRef<Lenis | null>(null);
+
+  useEffect(() => {
+    const lenis = new Lenis({
+      autoRaf: true,
+      duration: 1.05,
+      easing: SCROLL_EASING,
+      smoothWheel: true,
+      syncTouch: true,
+      respectReducedMotion: true,
+    });
+    lenisRef.current = lenis;
+
+    return () => {
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -288,16 +309,35 @@ function App() {
 
   const handleChapterClick = useCallback((index: number) => {
     const card = document.getElementById(`chapter-${index + 1}`);
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    card?.scrollIntoView({
-      behavior: reduceMotion ? 'auto' : 'smooth',
-      block: window.innerWidth <= 900 ? 'start' : 'center',
-    });
+    if (!card) return;
+
+    const bounds = card.getBoundingClientRect();
+    const isMobile = window.innerWidth <= 900;
+    const stickyMapHeight = isMobile
+      ? document.querySelector('.map-stage')?.getBoundingClientRect().height ?? 0
+      : 0;
+    const targetOffset = isMobile ? stickyMapHeight + 16 : (window.innerHeight - bounds.height) / 2;
+    const target = Math.max(0, window.scrollY + bounds.top - targetOffset);
+
+    if (lenisRef.current) {
+      lenisRef.current.scrollTo(target, { duration: 0.95, easing: SCROLL_EASING });
+    } else {
+      window.scrollTo({
+        top: target,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      });
+    }
   }, []);
 
   const handleReplay = useCallback(() => {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+    if (lenisRef.current) {
+      lenisRef.current.scrollTo(0, { duration: 1.1, easing: SCROLL_EASING });
+    } else {
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      });
+    }
   }, []);
 
   const durationMinutes = routeData ? Math.max(1, Math.round(routeData.durationSeconds / 60)) : null;
