@@ -1,70 +1,68 @@
-# Getting Started with Create React App
+# Scrolly Map
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+An interactive example of a **scrollytelling map**: as you read the story, the map follows a road trip from Twin Peaks to the Golden Gate Bridge in San Francisco.
 
-## Available Scripts
+[Open the live scrolly map](https://akhil9tiet.github.io/mapbox-scrolly).
 
-In the project directory, you can run:
+Scroll through the six story chapters to reveal the route, follow the moving camera, and watch the current street and journey progress update. You can also select a chapter to jump to that moment or replay the journey from the beginning.
 
-### `npm start`
+> **Try it:** run the app locally with the instructions below, then scroll the story beside the map. On smaller screens, the map stays at the top while you read.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Contents
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- [Explore the story](#explore-the-story)
+- [Run it locally](#run-it-locally)
+- [How it works](#how-it-works)
+- [Data and map credits](#data-and-map-credits)
 
-### `npm test`
+## Explore the story
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| Chapter | What changes |
+| --- | --- |
+| 01 · Get oriented | Start with the complete journey in view. |
+| 02 · Follow the road | The route begins to draw and the camera follows along it. |
+| 03 · Keep your place | Track the current position and street as the story advances. |
+| 04 · Change the scale | The camera shifts between street-level detail and a wider view. |
+| 05 · Arrive | Follow the final stretch toward the Golden Gate Bridge. |
+| 06 · Your pace | Choose a chapter or replay the route. |
 
-### `npm run build`
+## Run it locally
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+You'll need Node.js and npm installed.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+npm install
+npm start
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Open [http://localhost:3000](http://localhost:3000) to explore the story. Scroll, select a chapter card, or use **Replay the route** to start again.
 
-### `npm run eject`
+To create a production build:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm run build
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Deploy to GitHub Pages
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+The included GitHub Actions workflow builds and deploys the site whenever changes are pushed to `main`. The production build is configured for the project URL, `https://akhil9tiet.github.io/mapbox-scrolly`.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+For the first deployment, open the repository's **Settings → Pages** and set the build and deployment source to **GitHub Actions**. Then push to `main`, or run **Deploy to GitHub Pages** from the repository's **Actions** tab. The published site is available at the link above after the workflow completes.
 
-## Learn More
+The CARTO dark basemap is optional. To use it in the deployed site, add a repository Actions secret named `REACT_APP_CARTO_API_KEY`; without it, the app uses the OpenStreetMap raster fallback.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## How it works
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- **React** renders the story, chapter cards, and map interface.
+- **Lenis** smooths page scrolling. Scroll position drives the active chapter, route progress, and map camera.
+- **MapLibre GL JS**, through `react-map-gl`, renders the map and smoothly eases camera changes.
+- **deck.gl** draws the complete route and the portion revealed so far.
+- The driving route and street names are requested from the public **OSRM demo routing service** when the app loads. An internet connection is required; if the route service is unavailable, the app offers a retry.
+- The map uses CARTO dark raster tiles when `REACT_APP_CARTO_API_KEY` is configured, and falls back to OpenStreetMap raster tiles otherwise.
 
-### Code Splitting
+The main story and route interaction live in [`src/App.tsx`](./src/App.tsx). The map camera and rendering are in [`src/components/map/MapCanvas.tsx`](./src/components/map/MapCanvas.tsx).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Data and map credits
 
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Route geometry and road-step names: [OSRM](https://project-osrm.org/) using OpenStreetMap data.
+- Map tiles: [CARTO](https://carto.com/) when configured, with [OpenStreetMap](https://www.openstreetmap.org/copyright) as the fallback.

@@ -2,6 +2,7 @@
   "name": "mapbox-scrolly",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://akhil9tiet.github.io/mapbox-scrolly",
   "dependencies": {
     "@deck.gl/core": "^9.0.0",
     "@deck.gl/layers": "^9.0.0",
