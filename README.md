@@ -58,12 +58,12 @@ Browser map keys are included in requests from the published site. Restrict the 
 
 ## Google Analytics
 
-The app supports Google Analytics 4 (GA4). Create a GA4 property and web data stream in [Google Analytics](https://analytics.google.com/), then copy its Measurement ID (it starts with `G-`).
+The production app is configured to use the GA4 Measurement ID `G-DPP72KHXQ8`. Analytics stays disabled in local development unless you explicitly configure an ID.
 
-- **Local development:** add `REACT_APP_GA_MEASUREMENT_ID=G-XXXXXXXXXX` to `.env.local` in the project root, then restart `npm start`.
-- **GitHub Pages:** in **Settings → Secrets and variables → Actions → Variables**, create a **repository variable** named `REACT_APP_GA_MEASUREMENT_ID` and set its value to the Measurement ID. It is an identifier, not a secret. Push to `main` or rerun **Deploy to GitHub Pages** to rebuild the site.
+- **Local development:** to test analytics locally, create a GA4 web data stream in [Google Analytics](https://analytics.google.com/), then add `REACT_APP_GA_MEASUREMENT_ID=G-XXXXXXXXXX` to `.env.local` in the project root and restart `npm start`.
+- **GitHub Pages:** the workflow uses the production ID above by default. To override it, add a **repository variable** named `REACT_APP_GA_MEASUREMENT_ID` under **Settings → Secrets and variables → Actions → Variables**. A Measurement ID is public configuration, not a secret. Push to `main` or rerun **Deploy to GitHub Pages** to rebuild the site.
 
-Analytics is disabled when the ID is unset. When enabled, the app sends the standard page view and a `chapter_view` event as readers enter each chapter. The Measurement ID is embedded in the browser build, so it is visible to site visitors. Make sure your use of Google Analytics follows the privacy and consent requirements that apply to your audience.
+When enabled, the app sends the standard page view and a `chapter_view` event as readers enter each chapter. The Measurement ID is embedded in the browser build, so it is visible to site visitors. Make sure your use of Google Analytics follows the privacy and consent requirements that apply to your audience.
 
 ## How it works
 

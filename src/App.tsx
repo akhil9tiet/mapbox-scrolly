@@ -21,7 +21,8 @@ const TWIN_PEAKS: Coordinate = [-122.4476, 37.7545];
 const GOLDEN_GATE: Coordinate = [-122.47498, 37.80778];
 const EMPTY_ROUTE: Coordinate[] = [];
 const SCROLL_EASING = (progress: number) => 1 - Math.pow(1 - progress, 4);
-const GA_MEASUREMENT_ID = process.env.REACT_APP_GA_MEASUREMENT_ID;
+const GA_MEASUREMENT_ID = process.env.REACT_APP_GA_MEASUREMENT_ID
+  || (process.env.NODE_ENV === 'production' ? 'G-DPP72KHXQ8' : undefined);
 
 const chapters = [
   {
