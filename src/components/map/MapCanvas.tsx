@@ -29,20 +29,19 @@ const OPEN_STREET_MAP_STYLE = {
   layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
 };
 
-const cartoApiKey = process.env.REACT_APP_CARTO_API_KEY;
-const CARTO_DARK_RASTER_STYLE = cartoApiKey ? {
+const CARTO_DARK_RASTER_STYLE = {
   version: 8 as const,
   sources: {
     carto: {
       type: 'raster' as const,
-      tiles: [`https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoApiKey)}`],
+      tiles: ['https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png'],
       tileSize: 256,
       maxzoom: 20,
       attribution: '© OpenStreetMap contributors © CARTO',
     },
   },
   layers: [{ id: 'carto-dark', type: 'raster' as const, source: 'carto' }],
-} : null;
+};
 
 export const GLOBE_SATELLITE_STYLE = {
   version: 8 as const,
@@ -94,9 +93,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const [useFallbackStyle, setUseFallbackStyle] = React.useState(false);
   const currentViewport = displayViewport;
   targetViewportRef.current = controlledViewport ?? viewport;
-  const defaultMapStyle = !useFallbackStyle && CARTO_DARK_RASTER_STYLE
-    ? CARTO_DARK_RASTER_STYLE
-    : OPEN_STREET_MAP_STYLE;
+  const defaultMapStyle = useFallbackStyle ? OPEN_STREET_MAP_STYLE : CARTO_DARK_RASTER_STYLE;
   const mapStyle = requestedMapStyle ?? defaultMapStyle;
 
   const animateCamera = useCallback((time: number) => {

@@ -49,8 +49,6 @@ The included GitHub Actions workflow builds and deploys the site whenever change
 
 For the first deployment, open the repository's **Settings → Pages** and set the build and deployment source to **GitHub Actions**. Then push to `main`, or run **Deploy to GitHub Pages** from the repository's **Actions** tab. The published site is available at the link above after the workflow completes.
 
-The CARTO dark basemap is optional. To use it in the deployed site, add a repository Actions secret named `REACT_APP_CARTO_API_KEY`; without it, the app uses the OpenStreetMap raster fallback.
-
 ## How it works
 
 - **React** renders the story, chapter cards, and map interface.
@@ -58,11 +56,11 @@ The CARTO dark basemap is optional. To use it in the deployed site, add a reposi
 - **MapLibre GL JS**, through `react-map-gl`, renders the map and smoothly eases camera changes.
 - **deck.gl** draws the complete route and the portion revealed so far.
 - The driving route and street names are requested from the public **OSRM demo routing service** when the app loads. An internet connection is required; if the route service is unavailable, the app offers a retry.
-- The map uses CARTO dark raster tiles when `REACT_APP_CARTO_API_KEY` is configured, and falls back to OpenStreetMap raster tiles otherwise.
+- The map uses CARTO's dark raster tiles by default, with OpenStreetMap raster tiles as a fallback if CARTO is unavailable.
 
 The main story and route interaction live in [`src/App.tsx`](./src/App.tsx). The map camera and rendering are in [`src/components/map/MapCanvas.tsx`](./src/components/map/MapCanvas.tsx).
 
 ## Data and map credits
 
 - Route geometry and road-step names: [OSRM](https://project-osrm.org/) using OpenStreetMap data.
-- Map tiles: [CARTO](https://carto.com/) when configured, with [OpenStreetMap](https://www.openstreetmap.org/copyright) as the fallback.
+- Map tiles: [CARTO](https://carto.com/) dark tiles by default, with [OpenStreetMap](https://www.openstreetmap.org/copyright) as the fallback.
